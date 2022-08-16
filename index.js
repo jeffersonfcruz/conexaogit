@@ -38,7 +38,7 @@ app.post("/usuarios/cadastro",(req,res)=>{
         ){
             return res.status(400).send({output: "você deve digitar todos os dados"});
         } 
-        conexao.query("insert into usuario set ?",req.body,(error, data)=>{
+        conexao.query("insert into usuario set ?",req.body,(erro, data)=>{
             if (erro) return res.status(500).send({output:`erro ao tentar cadastrar: ${erro}`})
             res.status(201).send({output:`usuario cadastrado`,dados:data})
         }
