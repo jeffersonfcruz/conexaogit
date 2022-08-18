@@ -1,74 +1,191 @@
-const express = require('express');
-const mysql = require('mysql2');
-const cors = require('cors');
+// importação do módulo express para gerenciar o servidor
+//de aplicação em node
+const express = require("express");
+// importação do módulo do cors para nos ajudar no
+// trato com protocolos de requisição diferentes, tais
+// como: http; https; file; ftp
+const cors = require("cors");
+// importação do módulo do mysql
+const mysql = require("mysql2");
+// importação do módulo do jsonwebtoken para nos ajudar
+// a trabalhar com seção segura
+const jwt = require("jsonwebtoken");
+//para criptografar as senhas será utilizado o bcrypt
+//vamos importar o módulo
+const bcrypt = require("bcrypt");
 
+// Criando uma instância do servidor para carregá-lo.
+// faremos isso usando a constante app
 const app = express();
+
+// configurar o servidor express para aceitar dados em
+// formato json.
 app.use(express.json());
+
+// configurar o servidor para lidar com as requisições
+// de várias origens. Para isso iremos usar o cors
 app.use(cors());
 
-const conexao = mysql.createConnection ({
-    host: '172.17.0.1',
-    port: '6520',
-    user: 'root',
-    password: '123@senac',
-    database: 'bancoloja'
+// Configuração para comuinicação com o banco de dados
+const con = mysql.createConnection({
+  host: "172.17.0.1",
+  port: "6520",
+  user: "root",
+  password: "123@senac",
+  database: "bancoloja",
 });
-conexao.connect((erro)=>{
-    if(erro){
-        return console.error(`não conectou ->  ${erro}`);
+// executar a conexão com o banco de dados
+con.connect((erro) => {
+  if (erro) {
+    console.error(
+      `Erro ao tentar carregar o servidor de banco de dados ->${erro}`
+    );
+    return;
+  }
+  console.log(`Servidor de banco de dados conectado -> ${con.threadId}`);
+});
+
+// Vamos criar as rotas com os endpoints para realizar o gerenciamento
+// dos dados dos clientes
+app.get("/api/usuarios/listar", (req, res) => {
+  //vamos consultar os clientes cadastrados em banco e retornar os dados
+  con.query("Select * from usuario", (erro, result) => {
+    if (erro) {
+      return res
+        .status(400)
+        .send({ output: `Erro ao tentar carregar dados->${erro}` });
     }
-    console.log(`banco de dados online -> ${conexao.threadId}`);
-})
-
-app.get(`/usuarios/listar`,(req,res)=>{
-    conexao.query("select * from usuario",(erro,dados)=>{
-        if(erro)return res.status(500).send({output: `erro -> ${erro}`});
-        res.status(200).send({output:dados})
-    })
+    res.status(200).send({ output: result });
+  });
 });
 
-app.post("/usuarios/cadastro",(req,res)=>{
-    if (
-        req.body.nomeusuario == "" || 
-        req.body.senha == "" || 
-        req.body.email == "" || 
-        req.body.nomecompleto == "" || 
-        req.body.cpf == "" || 
-        req.body.foto == "" 
-        ){
-            return res.status(400).send({output: "você deve digitar todos os dados"});
-        } 
-        conexao.query("insert into usuario set ?",req.body,(erro, data)=>{
-            if (erro) return res.status(500).send({output:`erro ao tentar cadastrar: ${erro}`})
-            res.status(201).send({output:`usuario cadastrado`,dados:data})
-        }
-)})
-
-app.post ("/usuarios/login", (req, res)=>{
-    if (req.body.usuario == "" ||
-        req.body.senha == "" ){
-        return res.status(400).
-        send({output:`você deve inserir todos os dados`});
+app.get("/api/usuarios/listar/:id", (req, res) => {
+  con.query(
+    "select * from usuario where idusuario=?",
+    [req.params.id],
+    (erro, result) => {
+      if (erro) {
+        return res
+          .status(400)
+          .send({ output: `Erro ao tentar localizar o cliente->${erro}` });
+      }
+      res.status(200).send({ output: result });
     }
-    conexao.query (
-        "select * from usuario where nomeusuario=? and senha=?",
-        [req.body.nomeusuario,req.body.senha],
-        (error,data)=>{
-            if(error) return res.status(500).
-            send({output:`erro ao tentar logar -> ${error}`})
-            res.status(200).send({output:`logado`, dados:data});
-        }
-        );
+  );
 });
-app.put("/usuarios/atualizar/:id",(req, res)=>{
-    conexao.query("update usuario set ? where id = ?", [req.body, req.body.params.id],(error,data)=>{
-        if (error)
-        return res.status(500).
-        send({output:`erro ao tentar atualizar -> ${error}`,
+
+app.post("/api/usuarios/cadastro", (req, res) => {
+  bcrypt.hash(req.body.senha, 10, (erro, result) => {
+    if (erro) {
+      return res
+        .status(503)
+        .send({ output: `Erro interno ao gerar a senha ->${erro}` });
+    }
+    req.body.senha = result;
+
+    con.query("INSERT INTO usuario SET ?", [req.body], (erro, result) => {
+      if (erro) {
+        return res
+          .status(400)
+          .send({ output: `Erro ao tentar cadastrar -> ${erro}` });
+      }
+      res.status(201).send({ output: `Cadastro realizado`, payload: result });
     });
-    res.status(200).send({output:`atualizado`, dados: data});
-})
-})
+  });
+});
 
+app.post("/api/usuarios/login", (req, res) => {
+  const us = req.body.nomeusuario;
+  const sh = req.body.senha;
 
-app.listen("3000", ()=>console.log("Servidor online"))
+  con.query(
+    "Select * from usuario where nomeusuario=?",
+    [us],
+    (erro, result) => {
+      if (erro) {
+        return res
+          .status(400)
+          .send({ output: `Erro ao tentar logar -> ${erro}` });
+      }
+      if (!result) {
+        return res.status(404).send({ output: "Usuário não localizado" });
+      }
+
+      bcrypt.compare(sh, result[0].senha, (erro, igual) => {
+        if (erro) {
+          return res.status(503).send({ output: `Erro interno->${erro}` });
+        }
+        if (!igual) {
+          return res.status(400).send({ output: `Sua senha está incorreta` });
+        }
+        const token = criarToken(
+          result[0].idusuario,
+          result[0].nomeusuario,
+          result[0].email
+        );
+
+        res
+          .status(200)
+          .send({ output: `Logado`, payload: result, token: token });
+      });
+    }
+  );
+});
+
+app.put("/api/usuarios/atualizar/:id", verificar, (req, res) => {
+  con.query(
+    "Update usuario set ? where idusuario=?",
+    [req.body, req.params.id],
+    (erro, result) => {
+      if (erro) {
+        return res
+          .status(400)
+          .send({ output: `Erro ao tentar atualizar -> ${erro}` });
+      }
+      res.status(200).send({ output: `Dados atualizados`, payload: result });
+    }
+  );
+});
+
+app.delete("/api/usuarios/apagar/:id", (req, res) => {
+  con.query(
+    "Delete from usuario where idusuario=?",
+    [req.params.id],
+    (erro, result) => {
+      if (erro) {
+        return res
+          .status(400)
+          .send({ output: `Erro ao tenta apagar->${erro}` });
+      }
+      res.status(204).send({});
+    }
+  );
+});
+
+function verificar(req, res, next) {
+  const token_enviado = req.headers.token;
+
+  if (!token_enviado) {
+    return res.status(401).send({
+      output: `Token não existe. 
+        Você não tem autorização para acessar esta página`,
+    });
+  }
+  jwt.verify(token_enviado, "senac", (erro, rs) => {
+    if (erro) {
+      return res.status(503).send({
+        output: `Erro no processo de 
+            verificação do token->${erro}`,
+      });
+    }
+    return next();
+  });
+}
+
+function criarToken(id, usuario, email) {
+  return jwt.sign({ id: id, usuario: usuario, email: email }, "senac", {
+    expiresIn: "2d",
+  });
+}
+
+app.listen(3000, () => console.log(`Servidor online em http://localhost:3000`));
