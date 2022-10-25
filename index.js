@@ -162,6 +162,43 @@ app.delete("/api/usuarios/apagar/:id", (req, res) => {
   );
 });
 
+app.post("/api/usuarios/carrinho",(req,res)=>{
+  con.query("insert into carrinho set ?",[req.body],(erro,result)=>{
+  if (erro) {
+          return res.status(500).send({output:`Erro ao tentar cadastrar -> ${erro}`})
+          }
+          res.status(201).send({output:`Produto adicionado ao carrinho`,dados:result})
+  })
+});
+
+app.get("/api/usuarios/carrinho/:id",(req,res)=>{
+  con.query("select * from carrinho where idusuario=?",[req.params.id],(erro,result)=>{
+  if(erro){
+          return res.status(500).send({output:`Erro ao localizar o carrinho -> ${erro}`})
+          }
+          res.status(200).send({output:result})
+  })
+});
+
+app.put("/api/usuarios/carrinho/:id",(req,res)=>{
+  con.query("update carrinho set ? where idcarrinho=?",[req.body,req.params.id],(
+  erro,result)=>{
+  if (erro){
+          return res.status(500).send({output:`Não foi possivel atualizar o carrinho -> ${erro}`})
+          }
+          res.status(200).send({output:result})
+  })
+});
+
+app.delete("/api/usuarios/carrinho/:id",(req,res)=>{
+  con.query("delete from carrinho where idusuario=?",[req.params.id],(erro,result)=>{
+  if (erro){
+          return res.status(500).send({output:`Falha ao tentar concluir o pagamento -> ${erro}`})
+          }
+          res.status(204).send({output:`Apagou`});
+  })
+});
+
 function verificar(req, res, next) {
   const token_enviado = req.headers.token;
 
