@@ -28,11 +28,11 @@ app.use(cors());
 
 // Configuração para comuinicação com o banco de dados
 const con = mysql.createConnection({
-  host: "172.17.0.1",
-  port: "6520",
+  host: "127.0.0.1",
+  port: "3306",
   user: "root",
-  password: "alunos@123",
-  database: "bancoloja",
+  password: "123@senac",
+  database: "lojasenhoritta",
 });
 
 // executar a conexão com o banco de dados
@@ -49,9 +49,9 @@ con.connect((erro) => {
 
 // Vamos criar as rotas com os endpoints para realizar o gerenciamento
 // dos dados dos clientes
-app.get("/api/usuarios/listar", (req, res) => {
+app.get("/api/clientes/listar", (req, res) => {
   //vamos consultar os clientes cadastrados em banco e retornar os dados
-  con.query("Select * from usuario", (erro, result) => {
+  con.query("select * from clientes", (erro, result) => {
     if (erro) {
       return res
         .status(400)
@@ -61,9 +61,9 @@ app.get("/api/usuarios/listar", (req, res) => {
   });
 });
 
-app.get("/api/usuarios/listar/:id", (req, res) => {
+app.get("/api/clientes/listar/:id", (req, res) => {
   con.query(
-    "Select * from usuario where idusuario=?",
+    "select * from clientes where idcli=?",
     [req.params.id],
     (erro, result) => {
       if (erro) {
@@ -85,7 +85,7 @@ app.post("/api/usuarios/cadastro", (req, res) => {
     }
     req.body.senha = result;
 
-    con.query("INSERT INTO usuario SET ?", [req.body], (erro, result) => {
+    con.query("INSERT INTO clientes SET ?", [req.body], (erro, result) => {
       if (erro) {
         return res
           .status(400)
@@ -96,47 +96,41 @@ app.post("/api/usuarios/cadastro", (req, res) => {
   });
 });
 
-app.post("/api/usuarios/login", (req, res) => {
-  const us = req.body.nomeusuario;
+app.post("/api/clientes/login", (req, res) => {
+  const us = req.body.login;
   const sh = req.body.senha;
 
-  con.query(
-    "Select * from usuario where nomeusuario=?",
-    [us],
-    (erro, result) => {
-      if (erro) {
-        return res
-          .status(400)
-          .send({ output: `Erro ao tentar logar -> ${erro}` });
-      }
-      if (!result) {
-        return res.status(404).send({ output: "Usuário não localizado" });
-      }
-
-      bcrypt.compare(sh, result[0].senha, (erro, igual) => {
-        if (erro) {
-          return res.status(503).send({ output: `Erro interno->${erro}` });
-        }
-        if (!igual) {
-          return res.status(400).send({ output: `Sua senha está incorreta` });
-        }
-        const token = criarToken(
-          result[0].idusuario,
-          result[0].nomeusuario,
-          result[0].email
-        );
-
-        res
-          .status(200)
-          .send({ output: `Logado`, payload: result, token: token });
-      });
+  con.query("select * from clientes where login=?", [us], (erro, result) => {
+    if (erro) {
+      return res
+        .status(400)
+        .send({ output: `Erro ao tentar logar -> ${erro}` });
     }
-  );
+    if (!result) {
+      return res.status(404).send({ output: "Usuário não localizado" });
+    }
+
+    bcrypt.compare(sh, result[0].senha, (erro, igual) => {
+      if (erro) {
+        return res.status(503).send({ output: `Erro interno->${erro}` });
+      }
+      if (!igual) {
+        return res.status(400).send({ output: `Sua senha está incorreta` });
+      }
+      const token = criarToken(
+        result[0].idcli,
+        result[0].login,
+        result[0].email
+      );
+
+      res.status(200).send({ output: `Logado`, payload: result, token: token });
+    });
+  });
 });
 
-app.put("/api/usuarios/atualizar/:id", verificar, (req, res) => {
+app.put("/api/clientes/atualizar/:id", verificar, (req, res) => {
   con.query(
-    "Update usuario set ? where idusuario=?",
+    "Update clientes set ? where idcli=?",
     [req.body, req.params.id],
     (erro, result) => {
       if (erro) {
@@ -149,9 +143,9 @@ app.put("/api/usuarios/atualizar/:id", verificar, (req, res) => {
   );
 });
 
-app.delete("/api/usuarios/apagar/:id", (req, res) => {
+app.delete("/api/clientes/apagar/:id", (req, res) => {
   con.query(
-    "Delete from usuario where idusuario=?",
+    "Delete from clientes where idcli=?",
     [req.params.id],
     (erro, result) => {
       if (erro) {
@@ -164,7 +158,7 @@ app.delete("/api/usuarios/apagar/:id", (req, res) => {
   );
 });
 
-app.post("/api/usuarios/carrinho", (req, res) => {
+app.post("/api/clientes/carrinho", (req, res) => {
   con.query("insert into carrinho set ?", [req.body], (erro, result) => {
     if (erro) {
       return res
@@ -177,9 +171,9 @@ app.post("/api/usuarios/carrinho", (req, res) => {
   });
 });
 
-app.get("/api/usuarios/carrinho/:id", (req, res) => {
+app.get("/api/clientes/carrinho/:id", (req, res) => {
   con.query(
-    "select * from carrinho where idusuario=?",
+    "select * from carrinho where idcli=?",
     [req.params.id],
     (erro, result) => {
       if (erro) {
@@ -192,7 +186,7 @@ app.get("/api/usuarios/carrinho/:id", (req, res) => {
   );
 });
 
-app.put("/api/usuarios/carrinho/:id", (req, res) => {
+app.put("/api/clientes/carrinho/:id", (req, res) => {
   con.query(
     "update carrinho set ? where idcarrinho=?",
     [req.body, req.params.id],
@@ -208,7 +202,7 @@ app.put("/api/usuarios/carrinho/:id", (req, res) => {
 });
 app.delete("/api/carrinho/pagamento/:id", (req, res) => {
   con.query(
-    "delete from carrinho where idusuario=?",
+    "delete from carrinho where idcli=?",
     [req.params.id],
     (erro, result) => {
       if (erro) {
@@ -217,6 +211,32 @@ app.delete("/api/carrinho/pagamento/:id", (req, res) => {
           .send({ output: `Falha ao tentar concluir o pagamento ->${erro}` });
       }
       res.status(204).send({ output: `Apagou` });
+    }
+  );
+});
+
+app.get("/api/produtos/listar", (req, res) => {
+  con.query("select * from produtos", [req.params.id], (erro, result) => {
+    if (erro) {
+      return res
+        .status(400)
+        .send({ output: `Erro ao tentar localizar o Produto->${erro}` });
+    }
+    res.status(200).send({ output: result });
+  });
+});
+
+app.get("/api/produtos/listar:id", (req, res) => {
+  con.query(
+    "select * from produtos where codigo=?",
+    [req.params.id],
+    (erro, result) => {
+      if (erro) {
+        return res
+          .status(400)
+          .send({ output: `Erro ao tentar localizar o Produto->${erro}` });
+      }
+      res.status(200).send({ output: result });
     }
   );
 });
